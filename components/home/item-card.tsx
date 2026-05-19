@@ -1,5 +1,6 @@
 import Image from "next/image";
 import type { RecentItem } from "@/lib/recent-items";
+import { getFoundItemDetailUrl } from "@/lib/police-openapi/mappers";
 import { WalletIcon } from "@/components/ui/icons";
 
 type ItemCardProps = {
@@ -8,7 +9,7 @@ type ItemCardProps = {
 };
 
 export function ItemCard({ item, onSelect }: ItemCardProps) {
-  const detailUrl = `https://minwon24.police.go.kr/cvlcpt/selectFindListDetail.do?&cvlcptId=MW-201&pkupCmdtyMngId=${encodeURIComponent(item.id)}&sortSn=1`;
+  const detailUrl = getFoundItemDetailUrl(item.id, item.sequence);
 
   return (
     <article className="flex min-h-[17.8rem] w-[9.6rem] shrink-0 snap-start flex-col overflow-hidden rounded-[1.25rem] bg-surface-container-lowest transition-all hover:-translate-y-1 hover:shadow-[0_18px_30px_rgba(0,35,111,0.12)] sm:min-h-[18.8rem] sm:w-[10.4rem]">

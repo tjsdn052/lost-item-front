@@ -26,14 +26,14 @@ export function SearchFollowUpCta({
         <p className="mt-4 text-lg leading-relaxed text-slate-500">
           걱정 마세요. AI 에이전트가 등록한 정보를 바탕으로
           <br />
-          전국의 분실물 데이터베이스에서 24시간 계속 찾아드립니다.
+          전국의 습득물 데이터에서 계속 탐색합니다.
         </p>
         <Link
           href={href}
           className="mx-auto mt-10 inline-flex items-center gap-3 rounded-xl bg-secondary-container px-8 py-4 text-lg font-extrabold text-on-secondary-container transition-all hover:brightness-95 active:scale-95"
         >
           <TrackIcon className="h-5 w-5" />
-          계속 찾아달라고 하기 (추적 시작)
+          계속 찾아달라고 하기 (탐색 시작)
         </Link>
       </div>
     </section>

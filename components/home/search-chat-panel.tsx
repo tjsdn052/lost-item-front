@@ -55,7 +55,7 @@ export function SearchChatPanel({
             </div>
             <div className="text-left">
               <p className="font-headline text-lg font-extrabold tracking-tight text-primary">
-                유사한 분실물을 찾을 수 없어 추가 정보가 필요해요
+                유사한 습득물 후보를 찾기 위해 추가 정보가 필요해요
               </p>
             </div>
           </div>

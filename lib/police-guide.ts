@@ -1,10 +1,11 @@
 import "server-only";
 
+import { retrievePickupGuideContext } from "@/lib/agent/guide-rag";
+import { createPoliceOpenApiClientFromEnv } from "@/lib/police-openapi/client";
+import { mapFoundDetailToPoliceGuideDetail } from "@/lib/police-openapi/mappers";
 import type { PoliceGuideDetail } from "@/types/police-guide";
 
 const OPENAI_API_URL = "https://api.openai.com/v1/responses";
-const POLICE_DETAIL_URL =
-  "https://minwon24.police.go.kr/cvlcpt/selectFindListDetail.do?&cvlcptId=MW-201&sortSn=1&pkupCmdtyMngId=";
 
 type OpenAIResponse = {
   output?: Array<{
@@ -15,74 +16,6 @@ type OpenAIResponse = {
     }>;
   }>;
 };
-
-function decodeHtml(value: string) {
-  return value
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
-}
-
-function stripHtml(value: string) {
-  return decodeHtml(value)
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(p|div|li|ul|tr|td|th|h\d)>/gi, "\n")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\r/g, "")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .replace(/[ \t]{2,}/g, " ")
-    .trim();
-}
-
-function cleanText(value?: string | null) {
-  if (!value) {
-    return null;
-  }
-
-  const normalized = stripHtml(value).replace(/\s+/g, " ").trim();
-  return normalized || null;
-}
-
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function extractTableValue(html: string, label: string) {
-  const pattern = new RegExp(
-    `<th[^>]*>${escapeRegExp(label)}<\\/th>\\s*<td[^>]*>([\\s\\S]*?)<\\/td>`,
-    "i",
-  );
-
-  return cleanText(html.match(pattern)?.[1] ?? null);
-}
-
-function extractItemName(html: string) {
-  const match = html.match(
-    /id="form2"[\s\S]*?<h4[^>]*class="box-tit1"[^>]*>([\s\S]*?)<\/h4>/i,
-  );
-
-  return cleanText(match?.[1] ?? null);
-}
-
-function extractDetailDescription(html: string) {
-  const match = html.match(
-    /<h4[^>]*class="box-tit1"[^>]*>\s*상세내용\s*<\/h4>[\s\S]*?<li>\s*([\s\S]*?)<\/li>/i,
-  );
-
-  return cleanText(match?.[1] ?? null);
-}
-
-function extractVisitNotice(html: string) {
-  const match = html.match(
-    /※\s*([^<\n\r]+)(?:<|[\n\r]|$)/i,
-  );
-
-  return cleanText(match?.[1] ?? null);
-}
 
 function extractOutputText(response: OpenAIResponse) {
   const parts =
@@ -96,40 +29,24 @@ function extractOutputText(response: OpenAIResponse) {
   return parts.join("\n").trim();
 }
 
-export function getPoliceDetailUrl(atcId: string) {
-  return `${POLICE_DETAIL_URL}${encodeURIComponent(atcId)}`;
-}
+export async function fetchPoliceDetail(
+  atcId: string,
+  sequence = "1",
+): Promise<PoliceGuideDetail> {
+  const client = createPoliceOpenApiClientFromEnv();
 
-export async function fetchPoliceDetail(atcId: string): Promise<PoliceGuideDetail> {
-  const detailUrl = getPoliceDetailUrl(atcId);
-  const response = await fetch(detailUrl, {
-    headers: {
-      "user-agent": "Mozilla/5.0",
-    },
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    throw new Error(`Police detail request failed: ${response.status}`);
+  if (!client) {
+    throw new Error("PUBLIC_DATA_API_KEY is required.");
   }
 
-  const html = await response.text();
+  const response = await client.getFoundItemDetail({ atcId, sequence });
+  const [detail] = response.items;
 
-  return {
-    atcId,
-    detailUrl,
-    itemName: extractItemName(html),
-    foundDateTime: extractTableValue(html, "습득일"),
-    foundPlace: extractTableValue(html, "습득 장소"),
-    category: extractTableValue(html, "물품 분류"),
-    status: extractTableValue(html, "유실물 상태"),
-    detailDescription: extractDetailDescription(html),
-    visitNotice: extractVisitNotice(html),
-    receiptPlace: extractTableValue(html, "접수장소"),
-    storagePlace: extractTableValue(html, "보관장소"),
-    storagePhone: extractTableValue(html, "보관장소 연락처"),
-    managementNumber: extractTableValue(html, "관리번호"),
-  };
+  if (!detail) {
+    throw new Error("Police detail response is empty.");
+  }
+
+  return mapFoundDetailToPoliceGuideDetail(detail);
 }
 
 function buildFallbackGuidance(detail: PoliceGuideDetail) {
@@ -169,6 +86,19 @@ export async function generatePoliceGuide(
   }
 
   const input = [
+    "수령 안내 참고 지식:",
+    ...retrievePickupGuideContext(
+      [
+        itemTitle,
+        detail.itemName,
+        detail.storagePlace,
+        detail.managementNumber,
+        detail.detailDescription,
+      ]
+        .filter(Boolean)
+        .join(" "),
+    ).map((context) => `- ${context}`),
+    "",
     itemTitle ? `현재 사용자가 선택한 카드 제목: ${itemTitle}` : null,
     detail.itemName ? `경찰청 등록 물품명: ${detail.itemName}` : null,
     detail.foundDateTime ? `습득일시: ${detail.foundDateTime}` : null,
@@ -193,9 +123,9 @@ export async function generatePoliceGuide(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-5-nano",
+        model: "gpt-5.5",
         reasoning: {
-          effort: "minimal",
+          effort: "low",
         },
         max_output_tokens: 220,
         instructions:

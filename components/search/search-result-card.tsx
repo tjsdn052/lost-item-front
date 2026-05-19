@@ -1,5 +1,6 @@
 import Image from "next/image";
 import type { SearchResult } from "@/data/search-results";
+import { getFoundItemDetailUrl } from "@/lib/police-openapi/mappers";
 import { BoltIcon, LocationIcon, WalletIcon } from "@/components/ui/icons";
 
 type SearchResultCardProps = {
@@ -9,7 +10,7 @@ type SearchResultCardProps = {
 
 export function SearchResultCard({ item, onSelect }: SearchResultCardProps) {
   const isHighConfidence = item.confidence === "high";
-  const detailUrl = `https://minwon24.police.go.kr/cvlcpt/selectFindListDetail.do?&cvlcptId=MW-201&pkupCmdtyMngId=${encodeURIComponent(String(item.id))}&sortSn=1`;
+  const detailUrl = getFoundItemDetailUrl(String(item.id), item.sequence);
 
   return (
     <article className="rounded-xl">

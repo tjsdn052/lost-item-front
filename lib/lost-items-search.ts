@@ -1,11 +1,8 @@
 import "server-only";
 
-import {
-  DEFAULT_TOP_K,
-  mapSearchApiResponse,
-  type LostItemsSearchResult,
-  type SearchApiResponse,
-} from "@/lib/lost-items-search-shared";
+import { runFoundItemAgent } from "@/lib/agent/found-item-agent";
+import { createPoliceOpenApiClientFromEnv } from "@/lib/police-openapi/client";
+import type { LostItemsSearchResult } from "@/lib/lost-items-search-shared";
 
 type SearchLostItemsInput = {
   query?: string;
@@ -13,25 +10,13 @@ type SearchLostItemsInput = {
   image?: File | null;
 };
 
-function getApiBaseUrl() {
-  return process.env.LOST_ITEMS_API_BASE_URL?.replace(/\/$/, "");
-}
-
 export async function searchLostItems(
   input: SearchLostItemsInput,
 ): Promise<LostItemsSearchResult> {
-  const apiBaseUrl = getApiBaseUrl();
   const query = input.query?.trim();
   const sessionId = input.sessionId?.trim() || undefined;
   const image = input.image ?? null;
-
-  if (!apiBaseUrl) {
-    return {
-      items: [],
-      total: 0,
-      usedFallback: false,
-    };
-  }
+  const client = createPoliceOpenApiClientFromEnv();
 
   try {
     if (!query && !image) {
@@ -42,57 +27,34 @@ export async function searchLostItems(
       };
     }
 
-    const endpoint = image
-      ? query
-        ? "/api/v1/search/combined"
-        : "/api/v1/search/image"
-      : "/api/v1/search/text";
-
-    const response = image
-      ? await fetch(`${apiBaseUrl}${endpoint}`, {
-          method: "POST",
-          body: (() => {
-            const formData = new FormData();
-            formData.set("file", image);
-            formData.set("top_k", String(DEFAULT_TOP_K));
-            formData.set("use_agent", "true");
-
-            if (query) {
-              formData.set("query", query);
-            }
-
-            if (sessionId) {
-              formData.set("session_id", sessionId);
-            }
-
-            return formData;
-          })(),
-          cache: "no-store",
-        })
-      : await fetch(`${apiBaseUrl}${endpoint}`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            query,
-            top_k: DEFAULT_TOP_K,
-            use_agent: true,
-            session_id: sessionId ?? null,
-          }),
-          cache: "no-store",
-        });
-
-    if (!response.ok) {
-      throw new Error(`Search request failed with status ${response.status}`);
+    if (!client) {
+      return {
+        items: [],
+        total: 0,
+        sessionId,
+        assistantMessage:
+          "경찰청 공공데이터 인증키가 아직 설정되지 않았습니다. PUBLIC_DATA_API_KEY를 설정한 뒤 다시 검색해 주세요.",
+        usedFallback: false,
+      };
     }
 
-    const data = (await response.json()) as SearchApiResponse;
-    return mapSearchApiResponse(data, apiBaseUrl);
+    return await runFoundItemAgent(
+      {
+        query,
+        sessionId,
+        hasImage: Boolean(image),
+      },
+      {
+        searchFoundItemsByName: client.searchFoundItemsByName,
+      },
+    );
   } catch {
     return {
       items: [],
       total: 0,
+      sessionId,
+      assistantMessage:
+        "검색 요청을 처리하지 못했습니다. 잠시 후 다시 시도하거나 물건 종류, 색상, 장소를 더 구체적으로 입력해 주세요.",
       usedFallback: false,
     };
   }

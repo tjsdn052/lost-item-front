@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect } from "react";
 import type { SearchResult } from "@/data/search-results";
+import { getFoundItemDetailUrl } from "@/lib/police-openapi/mappers";
 import type { PoliceGuideDetail } from "@/types/police-guide";
 import { CloseIcon, LocationIcon, WalletIcon } from "@/components/ui/icons";
 
@@ -124,7 +125,8 @@ export function PoliceGuideModal({
     ? error
     : guidance ||
       "경찰청 상세 페이지를 확인하고 있어요. 연락처와 방문 방법을 정리해서 바로 안내드릴게요.";
-  const detailUrl = `https://minwon24.police.go.kr/cvlcpt/selectFindListDetail.do?&cvlcptId=MW-201&pkupCmdtyMngId=${encodeURIComponent(String(item.id))}&sortSn=1`;
+  const detailUrl =
+    detail?.detailUrl ?? getFoundItemDetailUrl(String(item.id), item.sequence);
 
   return (
     <div

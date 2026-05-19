@@ -159,6 +159,7 @@ export function RecentItemsCarousel({ items }: RecentItemsCarouselProps) {
   function toSearchResult(item: RecentItem): SearchResult {
     return {
       id: item.id,
+      sequence: item.sequence,
       title: item.name,
       location: item.location,
       pickupPlace: item.pickupPlace,

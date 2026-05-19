@@ -19,7 +19,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const detail = await fetchPoliceDetail(atcId);
+    const detail = await fetchPoliceDetail(
+      atcId,
+      body.item?.sequence ? String(body.item.sequence) : undefined,
+    );
     const guide = await generatePoliceGuide(detail, body.item?.title);
 
     return NextResponse.json({

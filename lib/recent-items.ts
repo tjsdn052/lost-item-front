@@ -1,22 +1,13 @@
 import "server-only";
 
-import {
-  buildPublicImageUrl,
-  type LostItemApiResult,
-} from "@/lib/lost-items-search-shared";
+import { createPoliceOpenApiClientFromEnv } from "@/lib/police-openapi/client";
+import { mapFoundItemsToRecentItems } from "@/lib/police-openapi/mappers";
 
 const DEFAULT_RECENT_ITEMS_LIMIT = 30;
-const RECENT_ITEMS_REVALIDATE_SECONDS = 60;
-
-type RecentItemsApiResponse = {
-  items: LostItemApiResult[];
-  total: number;
-  has_next: boolean;
-  search_time_ms: number;
-};
 
 export type RecentItem = {
   id: string;
+  sequence?: string;
   name: string;
   location: string;
   imageUrl?: string;
@@ -25,59 +16,35 @@ export type RecentItem = {
   pickupPlace?: string;
 };
 
-function getApiBaseUrl() {
-  return process.env.LOST_ITEMS_API_BASE_URL?.replace(/\/$/, "");
-}
+function formatApiDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
 
-function buildBadge(dateString: string) {
-  const [year, month, day] = dateString.split("-");
-
-  if (!year || !month || !day) {
-    return dateString || "날짜 미정";
-  }
-
-  return `${year}.${month}.${day}`;
-}
-
-function mapRecentItem(item: LostItemApiResult, apiBaseUrl: string): RecentItem {
-  const discoveredAt = buildBadge(item.fd_ymd);
-
-  return {
-    id: item.atc_id,
-    name: item.fd_prdt_nm || item.fd_sbjt || "이름 없는 분실물",
-    location: item.dep_place || item.pkup_plc_se_nm || item.prdt_cl_nm || "보관 장소 확인 필요",
-    imageUrl: buildPublicImageUrl(item.image_url, apiBaseUrl),
-    badgeLabel: discoveredAt,
-    discoveredAt,
-    pickupPlace: item.pkup_plc_se_nm || undefined,
-  };
+  return `${year}${month}${day}`;
 }
 
 export async function getRecentItems(
   limit = DEFAULT_RECENT_ITEMS_LIMIT,
 ): Promise<RecentItem[]> {
-  const apiBaseUrl = getApiBaseUrl();
+  const client = createPoliceOpenApiClientFromEnv();
 
-  if (!apiBaseUrl) {
+  if (!client) {
     return [];
   }
 
-  const params = new URLSearchParams({
-    limit: String(limit),
-    offset: "0",
-  });
+  const endDate = new Date();
+  const startDate = new Date(endDate);
+  startDate.setDate(endDate.getDate() - 30);
 
   try {
-    const response = await fetch(`${apiBaseUrl}/api/v1/search/recent?${params.toString()}`, {
-      next: { revalidate: RECENT_ITEMS_REVALIDATE_SECONDS },
+    const response = await client.searchFoundItemsByCategoryAreaPeriod({
+      startDate: formatApiDate(startDate),
+      endDate: formatApiDate(endDate),
+      pageNo: 1,
+      numOfRows: limit,
     });
-
-    if (!response.ok) {
-      throw new Error(`Recent items request failed with status ${response.status}`);
-    }
-
-    const data = (await response.json()) as RecentItemsApiResponse;
-    return data.items.map((item) => mapRecentItem(item, apiBaseUrl));
+    return mapFoundItemsToRecentItems(response.items);
   } catch {
     return [];
   }

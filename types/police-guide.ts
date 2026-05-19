@@ -1,5 +1,6 @@
 export type PoliceGuideDetail = {
   atcId: string;
+  sequence?: string | null;
   detailUrl: string;
   itemName?: string | null;
   foundDateTime?: string | null;

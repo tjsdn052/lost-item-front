@@ -1,5 +1,6 @@
 export type SearchResult = {
   id: number | string;
+  sequence?: string;
   title: string;
   location: string;
   pickupPlace?: string;

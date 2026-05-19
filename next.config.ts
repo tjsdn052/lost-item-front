@@ -14,6 +14,11 @@ const nextConfig: NextConfig = {
         port: "8000",
         pathname: "/api/v1/images/**",
       },
+      {
+        protocol: "https",
+        hostname: "www.lost112.go.kr",
+        pathname: "/lostnfs/images/**",
+      },
     ],
   },
 };
