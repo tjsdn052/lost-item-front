@@ -9,6 +9,7 @@ import {
 import { extractSearchSlotsWithOpenAI } from "@/lib/agent/openai-slot-extractor";
 import type { FoundItemSearchPlan, RankedFoundItem, SearchSlots } from "@/lib/agent/state";
 import { mapFoundItemToSearchResult } from "@/lib/police-openapi/mappers";
+import { filterOpenFoundItems, isClosedFoundItem } from "@/lib/police-openapi/status";
 import type { PoliceXmlItem, PoliceXmlResponse } from "@/lib/police-openapi/types";
 import type { LostItemsSearchResult } from "@/lib/lost-items-search-shared";
 
@@ -16,6 +17,8 @@ type AgentInput = {
   query?: string;
   sessionId?: string;
   hasImage?: boolean;
+  previousSlots?: Partial<SearchSlots>;
+  seedSlots?: Partial<SearchSlots>;
 };
 
 export type FoundItemAgentTools = {
@@ -25,6 +28,36 @@ export type FoundItemAgentTools = {
     pageNo?: number;
     numOfRows?: number;
   }) => Promise<PoliceXmlResponse>;
+  searchFoundItemsByLocation?: (input: {
+    productName?: string;
+    address?: string;
+    pageNo?: number;
+    numOfRows?: number;
+  }) => Promise<PoliceXmlResponse>;
+  searchFoundItemsByCategoryAreaPeriod?: (input: {
+    category1?: string;
+    category2?: string;
+    colorCode?: string;
+    startDate?: string;
+    endDate?: string;
+    locationCode?: string;
+    pageNo?: number;
+    numOfRows?: number;
+  }) => Promise<PoliceXmlResponse>;
+  getFoundItemDetail?: (input: {
+    atcId: string;
+    sequence: string;
+    source?: "police" | "portal";
+  }) => Promise<PoliceXmlResponse>;
+  getFoundItemWebStatus?: (input: {
+    atcId: string;
+    sequence: string;
+  }) => Promise<string | null>;
+  rerankFoundItems?: (input: {
+    query: string;
+    slots: SearchSlots;
+    items: RankedFoundItem[];
+  }) => Promise<RankedFoundItem[] | null>;
 };
 
 type AgentState = AgentInput & {
@@ -44,6 +77,8 @@ const FoundItemAgentState = Annotation.Root({
     value: (_left, right) => right,
     default: () => "",
   }),
+  previousSlots: Annotation<Partial<SearchSlots> | undefined>,
+  seedSlots: Annotation<Partial<SearchSlots> | undefined>,
   plan: Annotation<FoundItemSearchPlan | null>({
     value: (_left, right) => right,
     default: () => null,
@@ -90,6 +125,159 @@ function removeUndefinedSlots(slots: Partial<SearchSlots>) {
   ) as Partial<SearchSlots>;
 }
 
+function mergeSlots(
+  previousSlots: Partial<SearchSlots> | undefined,
+  currentSlots: Partial<SearchSlots>,
+) {
+  return removeUndefinedSlots({
+    ...previousSlots,
+    ...removeUndefinedSlots(currentSlots),
+  });
+}
+
+function emptyPoliceResponse(): PoliceXmlResponse {
+  return {
+    header: { resultCode: "00", resultMsg: "NORMAL SERVICE." },
+    items: [],
+    pagination: {},
+  };
+}
+
+async function runToolCall(
+  toolCall: FoundItemSearchPlan["toolCalls"][number],
+  tools: FoundItemAgentTools,
+) {
+  try {
+    if (toolCall.tool === "searchFoundItemsByName") {
+      return await tools.searchFoundItemsByName(toolCall.args);
+    }
+
+    if (
+      toolCall.tool === "searchFoundItemsByLocation" &&
+      tools.searchFoundItemsByLocation
+    ) {
+      return await tools.searchFoundItemsByLocation(toolCall.args);
+    }
+
+    if (
+      toolCall.tool === "searchFoundItemsByCategoryAreaPeriod" &&
+      tools.searchFoundItemsByCategoryAreaPeriod
+    ) {
+      return await tools.searchFoundItemsByCategoryAreaPeriod(toolCall.args);
+    }
+  } catch {
+    return emptyPoliceResponse();
+  }
+
+  return emptyPoliceResponse();
+}
+
+async function verifyRankedItemsAreOpen(
+  rankedItems: RankedFoundItem[],
+  tools: FoundItemAgentTools,
+) {
+  const getFoundItemDetail = tools.getFoundItemDetail;
+  const getFoundItemWebStatus = tools.getFoundItemWebStatus;
+
+  if (!getFoundItemDetail && !getFoundItemWebStatus) {
+    return rankedItems;
+  }
+
+  const checkedItems = await Promise.all(
+    rankedItems.map(async (ranked) => {
+      const sequence = ranked.item.fdSn ?? "1";
+
+      try {
+        const [detailResponse, webStatus] = await Promise.all([
+          getFoundItemDetail
+            ? getFoundItemDetail({
+                atcId: ranked.item.atcId,
+                sequence,
+                source:
+                  ranked.item.sourceService === "portal" ? "portal" : "police",
+              })
+            : Promise.resolve(null),
+          getFoundItemWebStatus
+            ? getFoundItemWebStatus({
+                atcId: ranked.item.atcId,
+                sequence,
+              })
+            : Promise.resolve(null),
+        ]);
+        const [detail] = detailResponse?.items ?? [];
+        const statusCandidate = {
+          csteSteNm: webStatus ?? detail?.csteSteNm ?? ranked.item.csteSteNm,
+        };
+
+        if (isClosedFoundItem(statusCandidate)) {
+          return null;
+        }
+
+        return {
+          ...ranked,
+          item: {
+            ...ranked.item,
+            ...detail,
+          },
+        };
+      } catch {
+        return ranked;
+      }
+    }),
+  );
+
+  return checkedItems.filter((item): item is RankedFoundItem => item !== null);
+}
+
+async function rerankWithOptionalTool(
+  rankedItems: RankedFoundItem[],
+  state: Pick<AgentState, "normalizedQuery" | "slots">,
+  tools: FoundItemAgentTools,
+) {
+  if (!tools.rerankFoundItems || rankedItems.length < 2 || !state.normalizedQuery) {
+    return rankedItems;
+  }
+
+  try {
+    const rerankedItems = await tools.rerankFoundItems({
+      query: state.normalizedQuery,
+      slots: state.slots,
+      items: rankedItems,
+    });
+
+    if (!rerankedItems || rerankedItems.length === 0) {
+      return rankedItems;
+    }
+
+    const originalByKey = new Map(
+      rankedItems.map((ranked) => [
+        `${ranked.item.atcId}:${ranked.item.fdSn ?? "1"}`,
+        ranked,
+      ]),
+    );
+    const seen = new Set<string>();
+    const accepted = rerankedItems.filter((ranked) => {
+      const key = `${ranked.item.atcId}:${ranked.item.fdSn ?? "1"}`;
+
+      if (seen.has(key) || !originalByKey.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
+    const remaining = rankedItems.filter((ranked) => {
+      const key = `${ranked.item.atcId}:${ranked.item.fdSn ?? "1"}`;
+
+      return !seen.has(key);
+    });
+
+    return [...accepted, ...remaining];
+  } catch {
+    return rankedItems;
+  }
+}
+
 function toResult(state: AgentState): LostItemsSearchResult {
   const sessionId = state.sessionId || randomUUID();
   const plan = state.plan;
@@ -103,7 +291,8 @@ function toResult(state: AgentState): LostItemsSearchResult {
       queryMetadata: {
         item_type: state.slots.itemName ?? null,
         color: state.slots.color ?? null,
-        location_hint: state.slots.placeHint ?? null,
+        location_hint: state.slots.address ?? state.slots.placeHint ?? null,
+        date_hint: state.slots.dateFrom ?? null,
       },
       usedFallback: false,
     };
@@ -123,7 +312,8 @@ function toResult(state: AgentState): LostItemsSearchResult {
     queryMetadata: {
       item_type: state.slots.itemName ?? null,
       color: state.slots.color ?? null,
-      location_hint: state.slots.placeHint ?? null,
+      location_hint: state.slots.address ?? state.slots.placeHint ?? null,
+      date_hint: state.slots.dateFrom ?? null,
     },
     usedFallback: false,
   };
@@ -156,12 +346,25 @@ export function createFoundItemAgent(tools: FoundItemAgentTools) {
     .addNode("extractSlots", async (state: AgentState) => {
       const rulePlan = state.plan ?? buildFoundItemSearchPlan(state.normalizedQuery);
       const openAiSlots = await extractSearchSlotsWithOpenAI(state.normalizedQuery);
-      const plan = openAiSlots
-        ? buildFoundItemSearchPlanFromSlots({
+      const currentSlots = openAiSlots
+        ? {
             ...rulePlan.slots,
             ...removeUndefinedSlots(openAiSlots),
-          })
-        : rulePlan;
+          }
+        : rulePlan.slots;
+      const mergedSlots = mergeSlots(state.previousSlots, {
+        ...currentSlots,
+        ...removeUndefinedSlots(state.seedSlots ?? {}),
+      });
+
+      if (state.plan?.followUpQuestion && Object.keys(mergedSlots).length === 0) {
+        return {
+          plan: state.plan,
+          slots: state.plan.slots,
+        };
+      }
+
+      const plan = buildFoundItemSearchPlanFromSlots(mergedSlots);
 
       return {
         plan,
@@ -174,25 +377,23 @@ export function createFoundItemAgent(tools: FoundItemAgentTools) {
       }
 
       const responses = await Promise.all(
-        state.plan.toolCalls.map((toolCall) => {
-          if (toolCall.tool === "searchFoundItemsByName") {
-            return tools.searchFoundItemsByName(toolCall.args);
-          }
-
-          return Promise.resolve({
-            header: { resultCode: "00", resultMsg: "NORMAL SERVICE." },
-            items: [],
-            pagination: {},
-          });
-        }),
+        state.plan.toolCalls.map((toolCall) => runToolCall(toolCall, tools)),
       );
 
       return {
-        rawItems: deduplicateItems(responses.flatMap((response) => response.items)),
+        rawItems: filterOpenFoundItems(
+          deduplicateItems(responses.flatMap((response) => response.items)),
+        ),
       };
     })
     .addNode("rankCandidates", async (state: AgentState) => ({
       rankedItems: rankFoundItems(state.rawItems, state.slots).slice(0, 9),
+    }))
+    .addNode("verifyOpenStatus", async (state: AgentState) => ({
+      rankedItems: await verifyRankedItemsAreOpen(state.rankedItems, tools),
+    }))
+    .addNode("rerankWithLLM", async (state: AgentState) => ({
+      rankedItems: await rerankWithOptionalTool(state.rankedItems, state, tools),
     }))
     .addNode("answerOrAskFollowUp", async (state: AgentState) => ({
       result: toResult(state),
@@ -201,7 +402,9 @@ export function createFoundItemAgent(tools: FoundItemAgentTools) {
     .addEdge("normalizeInput", "extractSlots")
     .addEdge("extractSlots", "searchFoundItems")
     .addEdge("searchFoundItems", "rankCandidates")
-    .addEdge("rankCandidates", "answerOrAskFollowUp")
+    .addEdge("rankCandidates", "verifyOpenStatus")
+    .addEdge("verifyOpenStatus", "rerankWithLLM")
+    .addEdge("rerankWithLLM", "answerOrAskFollowUp")
     .addEdge("answerOrAskFollowUp", END)
     .compile();
 }

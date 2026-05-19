@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createPoliceOpenApiClient,
+  createPortalFoundOpenApiClient,
   PoliceOpenApiError,
 } from "@/lib/police-openapi/client";
 
@@ -97,5 +98,51 @@ describe("createPoliceOpenApiClient", () => {
         "SERVICE KEY IS NOT REGISTERED ERROR.",
       ),
     );
+  });
+
+  it("calls portal found-item name and period endpoints with portal paths", async () => {
+    const fetcher = vi.fn(() =>
+      createXmlResponse(`
+        <response>
+          <header><resultCode>00</resultCode><resultMsg>NORMAL SERVICE.</resultMsg></header>
+          <body><items /></body>
+        </response>
+      `),
+    );
+    const client = createPortalFoundOpenApiClient({
+      serviceKey: "encoded-key",
+      fetcher,
+    });
+
+    await client.searchFoundItemsByName({
+      productName: "지갑",
+      custodyPlace: "충무로",
+      pageNo: 1,
+      numOfRows: 10,
+    });
+    await client.searchFoundItemsByCategoryAreaPeriod({
+      category1: "PRH000",
+      category2: "PRH200",
+      colorCode: "CL1002",
+      startDate: "20260518",
+      endDate: "20260519",
+      locationCode: "LCA000",
+      pageNo: 2,
+      numOfRows: 20,
+    });
+
+    const nameUrl = new URL(fetcher.mock.calls[0][0] as string);
+    expect(nameUrl.pathname).toBe(
+      "/1320000/LosPtfundInfoInqireService/getPtLosfundInfoAccTpNmCstdyPlace",
+    );
+    expect(nameUrl.searchParams.get("PRDT_NM")).toBe("지갑");
+    expect(nameUrl.searchParams.get("DEP_PLACE")).toBe("충무로");
+
+    const periodUrl = new URL(fetcher.mock.calls[1][0] as string);
+    expect(periodUrl.pathname).toBe(
+      "/1320000/LosPtfundInfoInqireService/getPtLosfundInfoAccToClAreaPd",
+    );
+    expect(periodUrl.searchParams.get("CLR_CD")).toBe("CL1002");
+    expect(periodUrl.searchParams.get("FD_COL_CD")).toBeNull();
   });
 });

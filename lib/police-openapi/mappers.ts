@@ -68,6 +68,7 @@ export function mapFoundItemToSearchResult(
 
   return {
     id: item.atcId,
+    source: item.sourceService === "portal" ? "portal" : "police",
     sequence: item.fdSn,
     title,
     location: firstNonEmpty(item.depPlace, item.orgNm, item.prdtClNm) ?? "보관 장소 확인 필요",
@@ -94,6 +95,7 @@ export function mapFoundDetailToPoliceGuideDetail(
 
   return {
     atcId,
+    source: item.sourceService === "portal" ? "portal" : "police",
     sequence,
     detailUrl: getFoundItemDetailUrl(atcId, sequence),
     itemName: firstNonEmpty(item.fdPrdtNm, item.fdSbjt) ?? null,
@@ -118,6 +120,7 @@ export function mapFoundItemsToRecentItems(items: PoliceXmlItem[]): RecentItem[]
 
     return {
       id: item.atcId,
+      source: item.sourceService === "portal" ? "portal" : "police",
       sequence: item.fdSn,
       name: firstNonEmpty(item.fdPrdtNm, item.fdSbjt, item.prdtClNm) ?? "이름 없는 습득물",
       location: firstNonEmpty(item.depPlace, item.orgNm, item.prdtClNm) ?? "보관 장소 확인 필요",

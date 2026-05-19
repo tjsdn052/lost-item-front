@@ -5,8 +5,13 @@ export type SearchSlots = {
   color?: string;
   brand?: string;
   placeHint?: string;
+  address?: string;
   dateFrom?: string;
   dateTo?: string;
+  category1?: string;
+  category2?: string;
+  colorCode?: string;
+  locationCode?: string;
 };
 
 export type FoundItemSearchToolCall =
@@ -20,10 +25,23 @@ export type FoundItemSearchToolCall =
       };
     }
   | {
+      tool: "searchFoundItemsByLocation";
+      args: {
+        productName?: string;
+        address: string;
+        pageNo: number;
+        numOfRows: number;
+      };
+    }
+  | {
       tool: "searchFoundItemsByCategoryAreaPeriod";
       args: {
+        category1?: string;
+        category2?: string;
+        colorCode?: string;
         startDate?: string;
         endDate?: string;
+        locationCode?: string;
         pageNo: number;
         numOfRows: number;
       };

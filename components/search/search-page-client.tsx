@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { SearchBox } from "@/components/home/search-box";
 import { SearchResultsGrid } from "@/components/search/search-results-grid";
+import { SearchQueryMetadataChips } from "@/components/search/search-query-metadata-chips";
 import { SearchSessionSync } from "@/components/search/search-session-sync";
 import { SearchStatusBanner } from "@/components/search/search-status-banner";
 import { searchLostItemsDirect } from "@/lib/lost-items-search-browser";
@@ -96,6 +97,7 @@ export function SearchPageClient({
           defaultSessionId={results.sessionId ?? sessionId}
         />
       </section>
+      <SearchQueryMetadataChips metadata={results.queryMetadata} />
       <SearchResultsGrid items={results.items} />
     </div>
   );

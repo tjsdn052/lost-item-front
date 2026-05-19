@@ -1,8 +1,12 @@
 import "server-only";
 
 import { retrievePickupGuideContext } from "@/lib/agent/guide-rag";
-import { createPoliceOpenApiClientFromEnv } from "@/lib/police-openapi/client";
+import {
+  createPoliceOpenApiClientFromEnv,
+  createPortalFoundOpenApiClientFromEnv,
+} from "@/lib/police-openapi/client";
 import { mapFoundDetailToPoliceGuideDetail } from "@/lib/police-openapi/mappers";
+import { tagFoundItemSource, type FoundItemSource } from "@/lib/police-openapi/sources";
 import type { PoliceGuideDetail } from "@/types/police-guide";
 
 const OPENAI_API_URL = "https://api.openai.com/v1/responses";
@@ -32,14 +36,21 @@ function extractOutputText(response: OpenAIResponse) {
 export async function fetchPoliceDetail(
   atcId: string,
   sequence = "1",
+  source: FoundItemSource = "police",
 ): Promise<PoliceGuideDetail> {
-  const client = createPoliceOpenApiClientFromEnv();
+  const client =
+    source === "portal"
+      ? createPortalFoundOpenApiClientFromEnv()
+      : createPoliceOpenApiClientFromEnv();
 
   if (!client) {
     throw new Error("PUBLIC_DATA_API_KEY is required.");
   }
 
-  const response = await client.getFoundItemDetail({ atcId, sequence });
+  const response = tagFoundItemSource(
+    await client.getFoundItemDetail({ atcId, sequence }),
+    source,
+  );
   const [detail] = response.items;
 
   if (!detail) {
@@ -87,7 +98,7 @@ export async function generatePoliceGuide(
 
   const input = [
     "수령 안내 참고 지식:",
-    ...retrievePickupGuideContext(
+    ...(await retrievePickupGuideContext(
       [
         itemTitle,
         detail.itemName,
@@ -97,7 +108,7 @@ export async function generatePoliceGuide(
       ]
         .filter(Boolean)
         .join(" "),
-    ).map((context) => `- ${context}`),
+    )).map((context) => `- ${context}`),
     "",
     itemTitle ? `현재 사용자가 선택한 카드 제목: ${itemTitle}` : null,
     detail.itemName ? `경찰청 등록 물품명: ${detail.itemName}` : null,

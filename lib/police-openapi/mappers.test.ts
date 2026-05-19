@@ -26,6 +26,7 @@ describe("police OpenAPI mappers", () => {
       ),
     ).toEqual({
       id: "F2023092000003095",
+      source: "police",
       sequence: "2",
       title: "boss지갑",
       location: "서울종로경찰서",
@@ -75,6 +76,7 @@ describe("police OpenAPI mappers", () => {
       }),
     ).toEqual({
       atcId: "F2018113000002322",
+      source: "police",
       sequence: "1",
       detailUrl:
         "https://www.lost112.go.kr/find/findDetail.do?ATC_ID=F2018113000002322&FD_SN=1",
@@ -106,6 +108,7 @@ describe("police OpenAPI mappers", () => {
     ).toEqual([
       {
         id: "F2023092100000404",
+        source: "police",
         sequence: "1",
         name: "카드지갑",
         location: "서울종로경찰서",

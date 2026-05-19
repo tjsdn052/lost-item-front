@@ -1,12 +1,21 @@
 import "server-only";
 
-import { createPoliceOpenApiClientFromEnv } from "@/lib/police-openapi/client";
+import {
+  createPoliceOpenApiClientFromEnv,
+  createPortalFoundOpenApiClientFromEnv,
+} from "@/lib/police-openapi/client";
 import { mapFoundItemsToRecentItems } from "@/lib/police-openapi/mappers";
+import {
+  mergeFoundItemResponses,
+  tagFoundItemSource,
+} from "@/lib/police-openapi/sources";
+import { filterOpenFoundItems } from "@/lib/police-openapi/status";
 
 const DEFAULT_RECENT_ITEMS_LIMIT = 30;
 
 export type RecentItem = {
   id: string;
+  source?: "police" | "portal";
   sequence?: string;
   name: string;
   location: string;
@@ -28,8 +37,9 @@ export async function getRecentItems(
   limit = DEFAULT_RECENT_ITEMS_LIMIT,
 ): Promise<RecentItem[]> {
   const client = createPoliceOpenApiClientFromEnv();
+  const portalClient = createPortalFoundOpenApiClientFromEnv();
 
-  if (!client) {
+  if (!client && !portalClient) {
     return [];
   }
 
@@ -38,13 +48,30 @@ export async function getRecentItems(
   startDate.setDate(endDate.getDate() - 30);
 
   try {
-    const response = await client.searchFoundItemsByCategoryAreaPeriod({
+    const request = {
       startDate: formatApiDate(startDate),
       endDate: formatApiDate(endDate),
       pageNo: 1,
       numOfRows: limit,
-    });
-    return mapFoundItemsToRecentItems(response.items);
+    };
+    const responses = await Promise.allSettled([
+      client
+        ? client
+            .searchFoundItemsByCategoryAreaPeriod(request)
+            .then((response) => tagFoundItemSource(response, "police"))
+        : Promise.reject(new Error("police client missing")),
+      portalClient
+        ? portalClient
+            .searchFoundItemsByCategoryAreaPeriod(request)
+            .then((response) => tagFoundItemSource(response, "portal"))
+        : Promise.reject(new Error("portal client missing")),
+    ]);
+    const response = mergeFoundItemResponses(
+      responses
+        .filter((result) => result.status === "fulfilled")
+        .map((result) => result.value),
+    );
+    return mapFoundItemsToRecentItems(filterOpenFoundItems(response.items));
   } catch {
     return [];
   }

@@ -11,6 +11,7 @@ type SearchResultCardProps = {
 export function SearchResultCard({ item, onSelect }: SearchResultCardProps) {
   const isHighConfidence = item.confidence === "high";
   const detailUrl = getFoundItemDetailUrl(String(item.id), item.sequence);
+  const sourceLabel = item.source === "portal" ? "포털기관" : "경찰청";
 
   return (
     <article className="rounded-xl">
@@ -35,7 +36,7 @@ export function SearchResultCard({ item, onSelect }: SearchResultCardProps) {
             </div>
           )}
 
-          <div className="absolute left-4 top-4">
+          <div className="absolute left-4 top-4 flex flex-wrap gap-2">
             <span
               className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-extrabold shadow-sm ${
                 isHighConfidence
@@ -45,6 +46,9 @@ export function SearchResultCard({ item, onSelect }: SearchResultCardProps) {
             >
               {isHighConfidence ? <BoltIcon className="h-3.5 w-3.5" /> : null}
               {item.matchLabel}
+            </span>
+            <span className="inline-flex items-center rounded-full bg-white/92 px-3 py-1 text-xs font-extrabold text-primary shadow-sm">
+              {sourceLabel}
             </span>
           </div>
         </div>
@@ -56,7 +60,7 @@ export function SearchResultCard({ item, onSelect }: SearchResultCardProps) {
         </h3>
         <p className="mt-2 flex items-center gap-1 text-sm text-slate-500">
           <LocationIcon className="h-4 w-4" />
-          {item.location} · {item.discoveredAt}
+          {sourceLabel} · {item.location} · {item.discoveredAt}
         </p>
         {item.pickupPlace ? (
           <p className="mt-2 text-sm text-slate-500">

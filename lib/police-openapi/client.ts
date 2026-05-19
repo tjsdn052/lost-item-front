@@ -3,12 +3,39 @@ import type { PoliceXmlResponse } from "@/lib/police-openapi/types";
 
 const DEFAULT_BASE_URL =
   "https://apis.data.go.kr/1320000/LosfundInfoInqireService";
+const PORTAL_FOUND_BASE_URL =
+  "https://apis.data.go.kr/1320000/LosPtfundInfoInqireService";
+
+type EndpointPaths = {
+  byName: string;
+  byCategoryAreaPeriod: string;
+  byLocation: string;
+  detail: string;
+  colorParam: "FD_COL_CD" | "CLR_CD";
+};
+
+const POLICE_ENDPOINT_PATHS: EndpointPaths = {
+  byName: "getLosfundInfoAccTpNmCstdyPlace",
+  byCategoryAreaPeriod: "getLosfundInfoAccToClAreaPd",
+  byLocation: "getLosfundInfoAccToLc",
+  detail: "getLosfundDetailInfo",
+  colorParam: "FD_COL_CD",
+};
+
+const PORTAL_ENDPOINT_PATHS: EndpointPaths = {
+  byName: "getPtLosfundInfoAccTpNmCstdyPlace",
+  byCategoryAreaPeriod: "getPtLosfundInfoAccToClAreaPd",
+  byLocation: "getPtLosfundInfoAccToLc",
+  detail: "getPtLosfundDetailInfo",
+  colorParam: "CLR_CD",
+};
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 
 type ClientOptions = {
   serviceKey: string;
   baseUrl?: string;
+  endpoints?: EndpointPaths;
   fetcher?: Fetcher;
 };
 
@@ -91,6 +118,7 @@ function ensureNormalResponse(response: PoliceXmlResponse) {
 export function createPoliceOpenApiClient({
   serviceKey,
   baseUrl = DEFAULT_BASE_URL,
+  endpoints = POLICE_ENDPOINT_PATHS,
   fetcher = fetch,
 }: ClientOptions) {
   async function request(
@@ -111,7 +139,7 @@ export function createPoliceOpenApiClient({
 
   return {
     searchFoundItemsByName(input: SearchFoundItemsByNameInput) {
-      return request("getLosfundInfoAccTpNmCstdyPlace", {
+      return request(endpoints.byName, {
         PRDT_NM: input.productName,
         DEP_PLACE: input.custodyPlace,
         pageNo: input.pageNo ?? 1,
@@ -121,10 +149,10 @@ export function createPoliceOpenApiClient({
     searchFoundItemsByCategoryAreaPeriod(
       input: SearchFoundItemsByCategoryAreaPeriodInput,
     ) {
-      return request("getLosfundInfoAccToClAreaPd", {
+      return request(endpoints.byCategoryAreaPeriod, {
         PRDT_CL_CD_01: input.category1,
         PRDT_CL_CD_02: input.category2,
-        FD_COL_CD: input.colorCode,
+        [endpoints.colorParam]: input.colorCode,
         START_YMD: input.startDate,
         END_YMD: input.endDate,
         N_FD_LCT_CD: input.locationCode,
@@ -133,7 +161,7 @@ export function createPoliceOpenApiClient({
       });
     },
     searchFoundItemsByLocation(input: SearchFoundItemsByLocationInput) {
-      return request("getLosfundInfoAccToLc", {
+      return request(endpoints.byLocation, {
         PRDT_NM: input.productName,
         ADDR: input.address,
         pageNo: input.pageNo ?? 1,
@@ -141,12 +169,20 @@ export function createPoliceOpenApiClient({
       });
     },
     getFoundItemDetail(input: GetFoundItemDetailInput) {
-      return request("getLosfundDetailInfo", {
+      return request(endpoints.detail, {
         ATC_ID: input.atcId,
         FD_SN: input.sequence,
       });
     },
   };
+}
+
+export function createPortalFoundOpenApiClient(options: Omit<ClientOptions, "baseUrl" | "endpoints">) {
+  return createPoliceOpenApiClient({
+    ...options,
+    baseUrl: PORTAL_FOUND_BASE_URL,
+    endpoints: PORTAL_ENDPOINT_PATHS,
+  });
 }
 
 export function createPoliceOpenApiClientFromEnv() {
@@ -157,4 +193,14 @@ export function createPoliceOpenApiClientFromEnv() {
   }
 
   return createPoliceOpenApiClient({ serviceKey });
+}
+
+export function createPortalFoundOpenApiClientFromEnv() {
+  const serviceKey = process.env.PUBLIC_DATA_API_KEY?.trim();
+
+  if (!serviceKey) {
+    return null;
+  }
+
+  return createPortalFoundOpenApiClient({ serviceKey });
 }

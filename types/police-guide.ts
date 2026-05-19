@@ -1,5 +1,6 @@
 export type PoliceGuideDetail = {
   atcId: string;
+  source?: "police" | "portal";
   sequence?: string | null;
   detailUrl: string;
   itemName?: string | null;

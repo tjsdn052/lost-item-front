@@ -19,6 +19,11 @@ const nextConfig: NextConfig = {
         hostname: "www.lost112.go.kr",
         pathname: "/lostnfs/images/**",
       },
+      {
+        protocol: "https",
+        hostname: "minwon24.police.go.kr",
+        pathname: "/lost112/find/getOpenapiAttachFileImage/**",
+      },
     ],
   },
 };
