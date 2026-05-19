@@ -28,6 +28,17 @@ export type SearchMetadata = {
   date_hint?: string | null;
 };
 
+export type SearchSourceCounts = {
+  police: number;
+  portal: number;
+};
+
+export type SearchSourceBreakdown = {
+  raw: SearchSourceCounts;
+  afterStatusFilter: SearchSourceCounts;
+  final: SearchSourceCounts;
+};
+
 export type SearchApiResponse = {
   items: LostItemApiResult[];
   total: number;
@@ -35,6 +46,7 @@ export type SearchApiResponse = {
   assistant_message?: string | null;
   agent_reasoning?: string | null;
   query_metadata?: SearchMetadata | null;
+  source_breakdown?: SearchSourceBreakdown | null;
   search_time_ms: number;
 };
 
@@ -45,6 +57,7 @@ export type LostItemsSearchResult = {
   assistantMessage?: string | null;
   agentReasoning?: string | null;
   queryMetadata?: SearchMetadata | null;
+  sourceBreakdown?: SearchSourceBreakdown | null;
   searchTimeMs?: number;
   usedFallback: boolean;
 };
@@ -146,6 +159,7 @@ export function mapSearchApiResponse(
     assistantMessage: data.assistant_message,
     agentReasoning: data.agent_reasoning,
     queryMetadata: data.query_metadata,
+    sourceBreakdown: data.source_breakdown,
     searchTimeMs: data.search_time_ms,
     usedFallback: false,
   };

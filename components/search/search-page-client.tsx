@@ -5,6 +5,7 @@ import { SearchBox } from "@/components/home/search-box";
 import { SearchResultsGrid } from "@/components/search/search-results-grid";
 import { SearchQueryMetadataChips } from "@/components/search/search-query-metadata-chips";
 import { SearchSessionSync } from "@/components/search/search-session-sync";
+import { SearchSourceBreakdown } from "@/components/search/search-source-breakdown";
 import { SearchStatusBanner } from "@/components/search/search-status-banner";
 import { searchLostItemsDirect } from "@/lib/lost-items-search-browser";
 import type { LostItemsSearchResult } from "@/lib/lost-items-search-shared";
@@ -98,6 +99,7 @@ export function SearchPageClient({
         />
       </section>
       <SearchQueryMetadataChips metadata={results.queryMetadata} />
+      <SearchSourceBreakdown breakdown={results.sourceBreakdown} />
       <SearchResultsGrid items={results.items} />
     </div>
   );

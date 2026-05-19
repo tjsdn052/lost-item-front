@@ -148,6 +148,55 @@ describe("runFoundItemAgent", () => {
     expect(result.items[0]).toMatchObject({ id: "SEMANTIC_MATCH" });
   });
 
+  it("reports source counts before filtering, after filtering, and in final results", async () => {
+    const result = await runFoundItemAgent(
+      {
+        query: "검은 지갑",
+      },
+      {
+        searchFoundItemsByName: vi.fn(async () => ({
+          header: { resultCode: "00", resultMsg: "NORMAL SERVICE." },
+          pagination: { totalCount: 3 },
+          items: [
+            {
+              atcId: "POLICE_OPEN",
+              sourceService: "police",
+              fdSn: "1",
+              fdPrdtNm: "지갑",
+              fdSbjt: "검정 지갑",
+              csteSteNm: "보관중",
+            },
+            {
+              atcId: "PORTAL_CLOSED",
+              sourceService: "portal",
+              fdSn: "1",
+              fdPrdtNm: "지갑",
+              fdSbjt: "검정 지갑",
+              csteSteNm: "종결",
+            },
+            {
+              atcId: "PORTAL_OPEN",
+              sourceService: "portal",
+              fdSn: "1",
+              fdPrdtNm: "지갑",
+              fdSbjt: "검정 지갑",
+              csteSteNm: "보관중",
+            },
+          ],
+        })),
+        getFoundItemWebStatus: vi.fn(async ({ atcId }) =>
+          atcId === "PORTAL_OPEN" ? "반환완료" : "보관중",
+        ),
+      },
+    );
+
+    expect(result.sourceBreakdown).toEqual({
+      raw: { police: 1, portal: 2 },
+      afterStatusFilter: { police: 1, portal: 1 },
+      final: { police: 1, portal: 0 },
+    });
+  });
+
   it("excludes candidates whose found item status is closed", async () => {
     const result = await runFoundItemAgent(
       {

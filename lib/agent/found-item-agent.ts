@@ -11,7 +11,11 @@ import type { FoundItemSearchPlan, RankedFoundItem, SearchSlots } from "@/lib/ag
 import { mapFoundItemToSearchResult } from "@/lib/police-openapi/mappers";
 import { filterOpenFoundItems, isClosedFoundItem } from "@/lib/police-openapi/status";
 import type { PoliceXmlItem, PoliceXmlResponse } from "@/lib/police-openapi/types";
-import type { LostItemsSearchResult } from "@/lib/lost-items-search-shared";
+import type {
+  LostItemsSearchResult,
+  SearchSourceBreakdown,
+  SearchSourceCounts,
+} from "@/lib/lost-items-search-shared";
 
 type AgentInput = {
   query?: string;
@@ -66,6 +70,7 @@ type AgentState = AgentInput & {
   rawItems: PoliceXmlItem[];
   slots: SearchSlots;
   rankedItems: RankedFoundItem[];
+  sourceBreakdown: SearchSourceBreakdown | null;
   result: LostItemsSearchResult | null;
 };
 
@@ -95,11 +100,34 @@ const FoundItemAgentState = Annotation.Root({
     value: (_left, right) => right,
     default: () => [],
   }),
+  sourceBreakdown: Annotation<SearchSourceBreakdown | null>({
+    value: (_left, right) => right,
+    default: () => null,
+  }),
   result: Annotation<LostItemsSearchResult | null>({
     value: (_left, right) => right,
     default: () => null,
   }),
 });
+
+function emptySourceCounts(): SearchSourceCounts {
+  return {
+    police: 0,
+    portal: 0,
+  };
+}
+
+function countItemsBySource(items: PoliceXmlItem[]): SearchSourceCounts {
+  return items.reduce((counts, item) => {
+    if (item.sourceService === "portal") {
+      counts.portal += 1;
+    } else {
+      counts.police += 1;
+    }
+
+    return counts;
+  }, emptySourceCounts());
+}
 
 function deduplicateItems(items: PoliceXmlItem[]) {
   const seen = new Set<string>();
@@ -281,6 +309,14 @@ async function rerankWithOptionalTool(
 function toResult(state: AgentState): LostItemsSearchResult {
   const sessionId = state.sessionId || randomUUID();
   const plan = state.plan;
+  const sourceBreakdown = state.sourceBreakdown
+    ? {
+        ...state.sourceBreakdown,
+        final: countItemsBySource(
+          state.rankedItems.map((ranked) => ranked.item),
+        ),
+      }
+    : null;
 
   if (plan?.followUpQuestion) {
     return {
@@ -294,6 +330,7 @@ function toResult(state: AgentState): LostItemsSearchResult {
         location_hint: state.slots.address ?? state.slots.placeHint ?? null,
         date_hint: state.slots.dateFrom ?? null,
       },
+      sourceBreakdown,
       usedFallback: false,
     };
   }
@@ -315,6 +352,7 @@ function toResult(state: AgentState): LostItemsSearchResult {
       location_hint: state.slots.address ?? state.slots.placeHint ?? null,
       date_hint: state.slots.dateFrom ?? null,
     },
+    sourceBreakdown,
     usedFallback: false,
   };
 }
@@ -373,17 +411,31 @@ export function createFoundItemAgent(tools: FoundItemAgentTools) {
     })
     .addNode("searchFoundItems", async (state: AgentState) => {
       if (!state.plan || state.plan.toolCalls.length === 0) {
-        return { rawItems: [] };
+        return {
+          rawItems: [],
+          sourceBreakdown: {
+            raw: emptySourceCounts(),
+            afterStatusFilter: emptySourceCounts(),
+            final: emptySourceCounts(),
+          },
+        };
       }
 
       const responses = await Promise.all(
         state.plan.toolCalls.map((toolCall) => runToolCall(toolCall, tools)),
       );
+      const deduplicatedItems = deduplicateItems(
+        responses.flatMap((response) => response.items),
+      );
+      const openItems = filterOpenFoundItems(deduplicatedItems);
 
       return {
-        rawItems: filterOpenFoundItems(
-          deduplicateItems(responses.flatMap((response) => response.items)),
-        ),
+        rawItems: openItems,
+        sourceBreakdown: {
+          raw: countItemsBySource(deduplicatedItems),
+          afterStatusFilter: countItemsBySource(openItems),
+          final: emptySourceCounts(),
+        },
       };
     })
     .addNode("rankCandidates", async (state: AgentState) => ({
