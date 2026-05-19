@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>찾았독 에이전트 아키텍처</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #18212f;
+        --muted: #5f6b7a;
+        --line: #d9dee7;
+        --panel: #ffffff;
+        --soft: #f6f8fb;
+        --accent: #0f766e;
+        --accent-soft: #dff5f1;
+        --warn: #b45309;
+        --warn-soft: #fff3d7;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #eef2f7;
+        color: var(--ink);
+        font-family:
+          Inter,
+          "Pretendard",
+          "Apple SD Gothic Neo",
+          "Malgun Gothic",
+          system-ui,
+          sans-serif;
+        line-height: 1.62;
+      }
+
+      main {
+        width: min(1180px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 44px 0 72px;
+      }
+
+      header {
+        margin-bottom: 28px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        letter-spacing: 0;
+      }
+
+      h1 {
+        font-size: clamp(32px, 5vw, 54px);
+        line-height: 1.08;
+      }
+
+      h2 {
+        margin-bottom: 16px;
+        font-size: 24px;
+      }
+
+      h3 {
+        margin-bottom: 10px;
+        font-size: 18px;
+      }
+
+      p {
+        margin: 0;
+      }
+
+      .eyebrow {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .lead {
+        max-width: 820px;
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 18px;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 20px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--panel);
+        padding: 4px 11px;
+        color: var(--muted);
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      section {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 24px;
+        margin-top: 18px;
+        box-shadow: 0 8px 24px rgb(21 29 43 / 6%);
+      }
+
+      .summary-grid,
+      .contract-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .note {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--soft);
+        padding: 16px;
+      }
+
+      .note strong {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--ink);
+      }
+
+      .note p {
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .warning {
+        border-color: #f0d08a;
+        background: var(--warn-soft);
+      }
+
+      .warning strong {
+        color: var(--warn);
+      }
+
+      .diagram {
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbfcfe;
+        padding: 14px;
+      }
+
+      .mermaid {
+        min-width: 820px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        font-size: 14px;
+      }
+
+      th,
+      td {
+        vertical-align: top;
+        border-bottom: 1px solid var(--line);
+        padding: 12px 14px;
+        text-align: left;
+      }
+
+      th {
+        background: var(--soft);
+        color: #2f3a4a;
+        font-weight: 700;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      code {
+        border: 1px solid #dfe5ee;
+        border-radius: 5px;
+        background: #f7f9fc;
+        padding: 1px 5px;
+        color: #223047;
+        font-family:
+          "JetBrains Mono",
+          "Cascadia Code",
+          Consolas,
+          monospace;
+        font-size: 0.92em;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      .section-copy {
+        margin-bottom: 16px;
+        color: var(--muted);
+      }
+
+      .two-column {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 14px;
+      }
+
+      @media (max-width: 820px) {
+        main {
+          width: min(100% - 24px, 1180px);
+          padding-top: 28px;
+        }
+
+        section {
+          padding: 18px;
+        }
+
+        .summary-grid,
+        .contract-grid,
+        .two-column {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Agent Architecture</div>
+        <h1>찾았독 습득물 검색 에이전트 코드맵</h1>
+        <p class="lead">
+          현재 프로젝트의 에이전트는 Next.js 서버 라우트에서 시작해 LangGraph
+          상태 그래프를 실행하고, 경찰청/포털기관 OpenAPI 후보를 검증한 뒤 GPT
+          reranker로 사용자 설명에 가까운 순서로 재정렬한다.
+        </p>
+        <div class="meta">
+          <span class="pill">Generated: 2026-05-19</span>
+          <span class="pill">Entry: <code>app/api/search/*</code></span>
+          <span class="pill">Graph: <code>lib/agent/found-item-agent.ts</code></span>
+          <span class="pill">RAG: <code>lib/agent/guide-rag.ts</code></span>
+        </div>
+      </header>
+
+      <section>
+        <h2>Runtime Overview</h2>
+        <p class="section-copy">
+          브라우저 UI는 API route를 호출하고, 서버는 API 키와 외부 API 접근을
+          숨긴 상태에서 검색 에이전트와 안내 RAG를 실행한다.
+        </p>
+        <div class="diagram">
+          <pre class="mermaid">
+flowchart TD
+  subgraph Client["Client UI"]
+    HomeSearch["components/home/search-box.tsx"]
+    SearchPage["components/search/search-page-client.tsx"]
+    ResultCards["components/search/search-result-card.tsx"]
+    GuideModal["components/search/police-guide-modal.tsx"]
+  end
+
+  subgraph NextApi["Next.js App Router API"]
+    TextApi["app/api/search/text/route.ts"]
+    SubmitApi["app/api/search/submit/route.ts"]
+    GuideApi["app/api/police-guide/route.ts"]
+  end
+
+  subgraph ServerUseCases["Server Use Cases"]
+    SearchUseCase["lib/lost-items-search.ts"]
+    GuideUseCase["lib/police-guide.ts"]
+  end
+
+  subgraph AgentLayer["Agent Layer"]
+    Graph["lib/agent/found-item-agent.ts"]
+    Strategy["lib/agent/search-strategy.ts"]
+    TextSlots["lib/agent/openai-slot-extractor.ts"]
+    ImageSlots["lib/agent/openai-image-slot-extractor.ts"]
+    Memory["lib/agent/session-memory.ts"]
+    Reranker["lib/agent/openai-reranker.ts"]
+    Guardrails["lib/agent/guardrails.ts"]
+    GuideRag["lib/agent/guide-rag.ts"]
+  end
+
+  subgraph DataLayer["External Data Layer"]
+    PoliceClient["lib/police-openapi/client.ts"]
+    Sources["lib/police-openapi/sources.ts"]
+    Status["lib/police-openapi/status.ts"]
+    WebStatus["lib/police-openapi/web-detail.ts"]
+    Mappers["lib/police-openapi/mappers.ts"]
+  end
+
+  subgraph External["External Systems"]
+    OpenAI["OpenAI Responses API"]
+    PoliceApi["경찰청 습득물 OpenAPI"]
+    PortalApi["포털기관 습득물 OpenAPI"]
+    Lost112["Lost112 상세 웹 페이지"]
+    Supabase["Supabase RPC optional"]
+  end
+
+  HomeSearch --> SubmitApi
+  SearchPage --> TextApi
+  ResultCards --> GuideApi
+  GuideModal --> GuideApi
+  TextApi --> SearchUseCase
+  SubmitApi --> SearchUseCase
+  GuideApi --> GuideUseCase
+  SearchUseCase --> Memory
+  SearchUseCase --> ImageSlots
+  SearchUseCase --> Graph
+  SearchUseCase --> PoliceClient
+  SearchUseCase --> Sources
+  SearchUseCase --> WebStatus
+  SearchUseCase --> Reranker
+  Graph --> Guardrails
+  Graph --> Strategy
+  Graph --> TextSlots
+  Graph --> Status
+  Graph --> Mappers
+  Reranker --> OpenAI
+  TextSlots --> OpenAI
+  ImageSlots --> OpenAI
+  GuideUseCase --> GuideRag
+  GuideUseCase --> PoliceClient
+  GuideUseCase --> Mappers
+  GuideUseCase --> OpenAI
+  GuideRag --> Supabase
+  PoliceClient --> PoliceApi
+  PoliceClient --> PortalApi
+  WebStatus --> Lost112
+          </pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>LangGraph State Flow</h2>
+        <p class="section-copy">
+          <code>createFoundItemAgent()</code>가 만드는 상태 그래프다. 각 노드는
+          <code>AgentState</code>의 일부 필드를 갱신하고 다음 노드로 넘긴다.
+        </p>
+        <div class="diagram">
+          <pre class="mermaid">
+flowchart TD
+  Start["START"] --> Normalize["normalizeInput<br/>query trim<br/>guardrails"]
+  Normalize --> Extract["extractSlots<br/>rule slots + OpenAI slots<br/>previousSlots + seedSlots merge"]
+  Extract --> Search["searchFoundItems<br/>toolCalls parallel<br/>dedupe + list status filter"]
+  Search --> Rank["rankCandidates<br/>deterministic score<br/>top 9"]
+  Rank --> Verify["verifyOpenStatus<br/>OpenAPI detail + Lost112 web status"]
+  Verify --> Rerank["rerankWithLLM<br/>optional GPT candidate rerank"]
+  Rerank --> Answer["answerOrAskFollowUp<br/>SearchResult mapping<br/>metadata + assistantMessage"]
+  Answer --> End["END"]
+
+  State["AgentState<br/>normalizedQuery, plan, rawItems,<br/>slots, rankedItems, result"] -. read/write .- Normalize
+  State -. read/write .- Extract
+  State -. read/write .- Search
+  State -. read/write .- Rank
+  State -. read/write .- Verify
+  State -. read/write .- Rerank
+  State -. read/write .- Answer
+          </pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>Tool Contract</h2>
+        <p class="section-copy">
+          <code>FoundItemAgentTools</code>는 에이전트가 외부 세계에 접근하는
+          경계다. 테스트에서는 mock으로 대체되고, 실제 실행에서는
+          <code>lib/lost-items-search.ts</code>가 구현체를 주입한다.
+        </p>
+        <div class="diagram">
+          <pre class="mermaid">
+flowchart TD
+  Agent["runFoundItemAgent(input, tools)"] --> Tools["FoundItemAgentTools"]
+
+  Tools --> ByName["searchFoundItemsByName<br/>PRDT_NM + DEP_PLACE"]
+  Tools --> ByLocation["searchFoundItemsByLocation<br/>PRDT_NM + ADDR"]
+  Tools --> ByPeriod["searchFoundItemsByCategoryAreaPeriod<br/>category + color + date + area"]
+  Tools --> Detail["getFoundItemDetail<br/>ATC_ID + FD_SN + source"]
+  Tools --> Web["getFoundItemWebStatus<br/>Lost112 HTML status"]
+  Tools --> Rerank["rerankFoundItems<br/>query + slots + rankedItems"]
+
+  ByName --> SourceMerge["querySources()<br/>police + portal merge"]
+  ByLocation --> SourceMerge
+  ByPeriod --> SourceMerge
+  Detail --> SourcePick["source based client select"]
+  SourceMerge --> PoliceClient["createPoliceOpenApiClientFromEnv()"]
+  SourceMerge --> PortalClient["createPortalFoundOpenApiClientFromEnv()"]
+  SourcePick --> PoliceClient
+  SourcePick --> PortalClient
+  Web --> Lost112["fetchFoundItemWebStatus()"]
+  Rerank --> OpenAIReranker["rerankFoundItemsWithOpenAI()"]
+          </pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>Code-Level Responsibilities</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>파일</th>
+              <th>역할</th>
+              <th>핵심 함수/타입</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>app/api/search/text/route.ts</code></td>
+              <td>텍스트 검색 HTTP 진입점</td>
+              <td><code>POST()</code> → <code>searchLostItemsByText()</code></td>
+            </tr>
+            <tr>
+              <td><code>app/api/search/submit/route.ts</code></td>
+              <td>텍스트 + 이미지 FormData 검색 진입점</td>
+              <td><code>POST()</code> → <code>searchLostItems()</code></td>
+            </tr>
+            <tr>
+              <td><code>lib/lost-items-search.ts</code></td>
+              <td>서버 use case. API client 생성, 세션 메모리, 이미지 슬롯, agent tool 주입 담당</td>
+              <td><code>searchLostItems()</code>, <code>querySources()</code></td>
+            </tr>
+            <tr>
+              <td><code>lib/agent/found-item-agent.ts</code></td>
+              <td>LangGraph 상태 그래프와 agent orchestration</td>
+              <td><code>createFoundItemAgent()</code>, <code>runFoundItemAgent()</code>, <code>FoundItemAgentTools</code></td>
+            </tr>
+            <tr>
+              <td><code>lib/agent/search-strategy.ts</code></td>
+              <td>룰 기반 슬롯 추출, API 호출 계획, 결정론 랭킹</td>
+              <td><code>buildFoundItemSearchPlan()</code>, <code>rankFoundItems()</code></td>
+            </tr>
+            <tr>
+              <td><code>lib/agent/openai-slot-extractor.ts</code></td>
+              <td>한국어 자연어 입력에서 검색 슬롯 추출</td>
+              <td><code>extractSearchSlotsWithOpenAI()</code></td>
+            </tr>
+            <tr>
+              <td><code>lib/agent/openai-image-slot-extractor.ts</code></td>
+              <td>이미지 파일에서 물건/색상 힌트 추출</td>
+              <td><code>extractSearchSlotsFromImageWithOpenAI()</code></td>
+            </tr>
+            <tr>
+              <td><code>lib/agent/openai-reranker.ts</code></td>
+              <td>검증된 후보를 GPT로 의미 기반 재정렬</td>
+              <td><code>rerankFoundItemsWithOpenAI()</code>, <code>candidateId()</code></td>
+            </tr>
+            <tr>
+              <td><code>lib/agent/session-memory.ts</code></td>
+              <td>세션별 이전 검색 슬롯 보관</td>
+              <td><code>getSessionSearchSlots()</code>, <code>saveSessionSearchSlots()</code></td>
+            </tr>
+            <tr>
+              <td><code>lib/police-openapi/client.ts</code></td>
+              <td>경찰청/포털기관 XML OpenAPI client</td>
+              <td><code>createPoliceOpenApiClient()</code>, <code>createPortalFoundOpenApiClient()</code></td>
+            </tr>
+            <tr>
+              <td><code>lib/police-openapi/status.ts</code></td>
+              <td>종결/반환 후보 필터링</td>
+              <td><code>isClosedFoundItem()</code>, <code>filterOpenFoundItems()</code></td>
+            </tr>
+            <tr>
+              <td><code>lib/police-openapi/web-detail.ts</code></td>
+              <td>OpenAPI 상태 불일치 보완용 Lost112 웹 상태 확인</td>
+              <td><code>fetchFoundItemWebStatus()</code></td>
+            </tr>
+            <tr>
+              <td><code>lib/agent/guide-rag.ts</code></td>
+              <td>습득물 수령 안내용 RAG context 검색</td>
+              <td><code>retrievePickupGuideContext()</code></td>
+            </tr>
+            <tr>
+              <td><code>lib/police-guide.ts</code></td>
+              <td>상세 후보 수령 안내 생성</td>
+              <td><code>fetchPoliceDetail()</code>, <code>generatePoliceGuide()</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>State And Data Contracts</h2>
+        <div class="contract-grid">
+          <div class="note">
+            <strong><code>AgentInput</code></strong>
+            <p>
+              <code>query</code>, <code>sessionId</code>, <code>hasImage</code>,
+              <code>previousSlots</code>, <code>seedSlots</code>를 받아 검색의
+              초기 상태를 만든다.
+            </p>
+          </div>
+          <div class="note">
+            <strong><code>SearchSlots</code></strong>
+            <p>
+              물건명, 색상, 브랜드, 장소, 주소, 날짜 범위, 경찰청 코드값을 담는
+              agent 내부 검색 의도 모델이다.
+            </p>
+          </div>
+          <div class="note">
+            <strong><code>FoundItemSearchPlan</code></strong>
+            <p>
+              follow-up 질문 여부와 호출할 OpenAPI tool 목록을 담는다.
+              물건명이 없으면 검색보다 추가 질문을 우선한다.
+            </p>
+          </div>
+          <div class="note">
+            <strong><code>RankedFoundItem</code></strong>
+            <p>
+              원본 OpenAPI item, 점수, 매칭 근거를 함께 보관한다. GPT reranker는
+              이 후보 배열만 재정렬할 수 있다.
+            </p>
+          </div>
+          <div class="note">
+            <strong><code>LostItemsSearchResult</code></strong>
+            <p>
+              UI가 소비하는 최종 결과다. 카드 목록, 세션 ID, assistant message,
+              검색 메타데이터를 포함한다.
+            </p>
+          </div>
+          <div class="note warning">
+            <strong>Trust Boundary</strong>
+            <p>
+              LLM은 후보를 생성하지 않는다. <code>candidateId</code>가 기존
+              후보에 없으면 무시하고, 실패 시 결정론 랭킹을 그대로 사용한다.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Search Execution Details</h2>
+        <div class="two-column">
+          <div class="note">
+            <strong>검색 후보 생성</strong>
+            <ul>
+              <li>룰 기반 추출과 OpenAI 슬롯 추출을 병합한다.</li>
+              <li>이전 세션 슬롯과 이미지 기반 seed 슬롯을 함께 반영한다.</li>
+              <li>물건명, 위치, 기간/지역/색상 검색을 병렬로 호출한다.</li>
+              <li>경찰청 API와 포털기관 API 응답을 source label과 함께 합친다.</li>
+            </ul>
+          </div>
+          <div class="note">
+            <strong>검증과 랭킹</strong>
+            <ul>
+              <li>목록 응답에서 종결/반환 상태 후보를 먼저 제거한다.</li>
+              <li>상위 후보는 상세 API와 Lost112 웹 상태를 다시 확인한다.</li>
+              <li>결정론 점수는 이름, 색상, 장소, 날짜, 최신성을 반영한다.</li>
+              <li>GPT reranker는 검증된 후보 요약만 받아 최종 순서를 조정한다.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>RAG Position</h2>
+        <p class="section-copy">
+          RAG는 검색 후보를 찾는 핵심 경로가 아니라, 사용자가 특정 후보를 선택한
+          뒤 “어떻게 찾으러 가야 하는지”를 안내하는 상세 안내 경로에서 사용된다.
+        </p>
+        <div class="diagram">
+          <pre class="mermaid">
+flowchart TD
+  GuideApi["app/api/police-guide/route.ts"] --> FetchDetail["fetchPoliceDetail()"]
+  GuideApi --> Generate["generatePoliceGuide()"]
+  FetchDetail --> DetailApi["OpenAPI detail by source"]
+  Generate --> Rag["retrievePickupGuideContext()"]
+  Rag --> SupabaseRpc["Supabase RPC<br/>match_pickup_guide_documents"]
+  Rag --> LocalDocs["Local LangChain Documents fallback"]
+  Generate --> GuideLlm["OpenAI guidance generation"]
+  GuideLlm --> Fallback["fallback guidance<br/>when key or request fails"]
+          </pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+
+      mermaid.initialize({
+        startOnLoad: true,
+        securityLevel: "strict",
+        theme: "base",
+        themeVariables: {
+          primaryColor: "#dff5f1",
+          primaryTextColor: "#18212f",
+          primaryBorderColor: "#0f766e",
+          lineColor: "#667085",
+          secondaryColor: "#f6f8fb",
+          tertiaryColor: "#ffffff",
+          fontFamily:
+            "Inter, Pretendard, Apple SD Gothic Neo, Malgun Gothic, system-ui, sans-serif",
+        },
+        flowchart: {
+          curve: "basis",
+          htmlLabels: true,
+        },
+      });
+    </script>
+  </body>
+</html>
