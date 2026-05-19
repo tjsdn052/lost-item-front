@@ -197,6 +197,59 @@ describe("runFoundItemAgent", () => {
     });
   });
 
+  it("keeps source-diverse candidates available for reranking before final slicing", async () => {
+    const rerankFoundItems = vi.fn(async ({ items }) => [
+      items.find((ranked) => ranked.item.atcId === "PORTAL_MATCH")!,
+      ...items.filter((ranked) => ranked.item.atcId !== "PORTAL_MATCH"),
+    ]);
+
+    const result = await runFoundItemAgent(
+      {
+        query: "검은 지갑",
+      },
+      {
+        searchFoundItemsByName: vi.fn(async () => ({
+          header: { resultCode: "00", resultMsg: "NORMAL SERVICE." },
+          pagination: { totalCount: 13 },
+          items: [
+            ...Array.from({ length: 12 }, (_, index) => ({
+              atcId: `POLICE_${index + 1}`,
+              sourceService: "police" as const,
+              fdSn: "1",
+              fdPrdtNm: "검정 지갑",
+              fdSbjt: "검정 지갑",
+              fdYmd: "2026-05-18",
+            })),
+            {
+              atcId: "PORTAL_MATCH",
+              sourceService: "portal",
+              fdSn: "1",
+              fdPrdtNm: "지갑",
+              fdSbjt: "검정 반지갑",
+              fdYmd: "2026-05-18",
+            },
+          ],
+        })),
+        rerankFoundItems,
+      } as Parameters<typeof runFoundItemAgent>[1],
+    );
+
+    expect(rerankFoundItems).toHaveBeenCalledWith(
+      expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({
+            item: expect.objectContaining({ atcId: "PORTAL_MATCH" }),
+          }),
+        ]),
+      }),
+    );
+    expect(result.items).toHaveLength(9);
+    expect(result.items[0]).toMatchObject({
+      id: "PORTAL_MATCH",
+      source: "portal",
+    });
+  });
+
   it("excludes candidates whose found item status is closed", async () => {
     const result = await runFoundItemAgent(
       {

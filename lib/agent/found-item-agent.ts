@@ -11,10 +11,11 @@ import type { FoundItemSearchPlan, RankedFoundItem, SearchSlots } from "@/lib/ag
 import { mapFoundItemToSearchResult } from "@/lib/police-openapi/mappers";
 import { filterOpenFoundItems, isClosedFoundItem } from "@/lib/police-openapi/status";
 import type { PoliceXmlItem, PoliceXmlResponse } from "@/lib/police-openapi/types";
-import type {
-  LostItemsSearchResult,
-  SearchSourceBreakdown,
-  SearchSourceCounts,
+import {
+  DEFAULT_TOP_K,
+  type LostItemsSearchResult,
+  type SearchSourceBreakdown,
+  type SearchSourceCounts,
 } from "@/lib/lost-items-search-shared";
 
 type AgentInput = {
@@ -127,6 +128,32 @@ function countItemsBySource(items: PoliceXmlItem[]): SearchSourceCounts {
 
     return counts;
   }, emptySourceCounts());
+}
+
+function rankedItemKey(ranked: RankedFoundItem) {
+  return `${ranked.item.atcId}:${ranked.item.fdSn ?? "1"}`;
+}
+
+function sourceOfRankedItem(ranked: RankedFoundItem) {
+  return ranked.item.sourceService === "portal" ? "portal" : "police";
+}
+
+function buildSourceAwareShortlist(rankedItems: RankedFoundItem[]) {
+  const selected = new Map<string, RankedFoundItem>();
+  const addCandidate = (ranked: RankedFoundItem) => {
+    selected.set(rankedItemKey(ranked), ranked);
+  };
+
+  rankedItems.slice(0, DEFAULT_TOP_K).forEach(addCandidate);
+
+  for (const source of ["police", "portal"] as const) {
+    rankedItems
+      .filter((ranked) => sourceOfRankedItem(ranked) === source)
+      .slice(0, DEFAULT_TOP_K)
+      .forEach(addCandidate);
+  }
+
+  return Array.from(selected.values()).sort((left, right) => right.score - left.score);
 }
 
 function deduplicateItems(items: PoliceXmlItem[]) {
@@ -313,7 +340,7 @@ function toResult(state: AgentState): LostItemsSearchResult {
     ? {
         ...state.sourceBreakdown,
         final: countItemsBySource(
-          state.rankedItems.map((ranked) => ranked.item),
+          state.rankedItems.slice(0, DEFAULT_TOP_K).map((ranked) => ranked.item),
         ),
       }
     : null;
@@ -335,7 +362,7 @@ function toResult(state: AgentState): LostItemsSearchResult {
     };
   }
 
-  const items = state.rankedItems.map((ranked) =>
+  const items = state.rankedItems.slice(0, DEFAULT_TOP_K).map((ranked) =>
     mapFoundItemToSearchResult(ranked.item, ranked.score, ranked.matchedVia),
   );
 
@@ -439,7 +466,9 @@ export function createFoundItemAgent(tools: FoundItemAgentTools) {
       };
     })
     .addNode("rankCandidates", async (state: AgentState) => ({
-      rankedItems: rankFoundItems(state.rawItems, state.slots).slice(0, 9),
+      rankedItems: buildSourceAwareShortlist(
+        rankFoundItems(state.rawItems, state.slots),
+      ),
     }))
     .addNode("verifyOpenStatus", async (state: AgentState) => ({
       rankedItems: await verifyRankedItemsAreOpen(state.rankedItems, tools),
