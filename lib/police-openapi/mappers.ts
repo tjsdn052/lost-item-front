@@ -1,7 +1,6 @@
 import type { SearchResult } from "@/data/search-results";
 import type { RecentItem } from "@/lib/recent-items";
 import type { PoliceXmlItem } from "@/lib/police-openapi/types";
-import type { PoliceGuideDetail } from "@/types/police-guide";
 
 const LOST112_DETAIL_URL = "https://www.lost112.go.kr/find/findDetail.do";
 
@@ -77,37 +76,6 @@ export function mapFoundItemToSearchResult(
     matchLabel: formatMatchLabel(score),
     confidence: clampScore(score) >= 82 ? "high" : "medium",
     imageUrl,
-  };
-}
-
-export function mapFoundDetailToPoliceGuideDetail(
-  item: PoliceXmlItem,
-): PoliceGuideDetail {
-  const atcId = item.atcId;
-  const sequence = item.fdSn;
-  const foundDate = item.fdYmd?.trim();
-  const foundHour = item.fdHor?.trim();
-  const foundDateTime = foundDate
-    ? foundHour
-      ? `${foundDate} ${foundHour}시`
-      : foundDate
-    : null;
-
-  return {
-    atcId,
-    source: item.sourceService === "portal" ? "portal" : "police",
-    sequence,
-    detailUrl: getFoundItemDetailUrl(atcId, sequence),
-    itemName: firstNonEmpty(item.fdPrdtNm, item.fdSbjt) ?? null,
-    foundDateTime,
-    foundPlace: item.fdPlace || null,
-    category: item.prdtClNm || null,
-    status: item.csteSteNm || null,
-    detailDescription: item.uniq || null,
-    receiptPlace: firstNonEmpty(item.orgNm, item.depPlace) ?? null,
-    storagePlace: firstNonEmpty(item.depPlace, item.orgNm) ?? null,
-    storagePhone: item.tel || null,
-    managementNumber: sequence ? `${atcId}-${sequence}` : atcId,
   };
 }
 

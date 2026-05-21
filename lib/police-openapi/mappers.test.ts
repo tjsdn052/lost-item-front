@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  mapFoundDetailToPoliceGuideDetail,
   mapFoundItemToSearchResult,
   mapFoundItemsToRecentItems,
 } from "@/lib/police-openapi/mappers";
@@ -56,41 +55,6 @@ describe("police OpenAPI mappers", () => {
     expect(result.imageUrl).toBeUndefined();
     expect(result.matchLabel).toBe("유사 후보");
     expect(result.confidence).toBe("medium");
-  });
-
-  it("maps a found item detail record to pickup guide detail facts", () => {
-    expect(
-      mapFoundDetailToPoliceGuideDetail({
-        atcId: "F2018113000002322",
-        fdSn: "1",
-        csteSteNm: "보관중",
-        depPlace: "서울강북경찰서",
-        fdPlace: "노상",
-        fdPrdtNm: "여성용가방",
-        fdYmd: "2018-11-30",
-        fdHor: "24",
-        prdtClNm: "가방 > 여성용가방",
-        orgNm: "서울강북경찰서",
-        tel: "02-944-4347",
-        uniq: "본인 증명 서류를 지참하시어 방문하시기 바랍니다.",
-      }),
-    ).toEqual({
-      atcId: "F2018113000002322",
-      source: "police",
-      sequence: "1",
-      detailUrl:
-        "https://www.lost112.go.kr/find/findDetail.do?ATC_ID=F2018113000002322&FD_SN=1",
-      itemName: "여성용가방",
-      foundDateTime: "2018-11-30 24시",
-      foundPlace: "노상",
-      category: "가방 > 여성용가방",
-      status: "보관중",
-      detailDescription: "본인 증명 서류를 지참하시어 방문하시기 바랍니다.",
-      receiptPlace: "서울강북경찰서",
-      storagePlace: "서울강북경찰서",
-      storagePhone: "02-944-4347",
-      managementNumber: "F2018113000002322-1",
-    });
   });
 
   it("maps recent found items into carousel items", () => {
