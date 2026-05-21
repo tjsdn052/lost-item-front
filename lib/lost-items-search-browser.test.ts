@@ -53,4 +53,31 @@ describe("lost-items-search-browser", () => {
     });
     expect(result).toMatchObject({ total: 0, usedFallback: false });
   });
+
+  it("passes an abort signal to the streamed search request", async () => {
+    const controller = new AbortController();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          streamFromText('event: result\ndata: {"items":[],"total":0,"usedFallback":false}\n\n'),
+          {
+            headers: { "Content-Type": "text/event-stream" },
+          },
+        ),
+      ),
+    );
+
+    await searchLostItemsDirect(
+      { query: "검은 지갑" },
+      { signal: controller.signal },
+    );
+
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/search/stream",
+      expect.objectContaining({
+        signal: controller.signal,
+      }),
+    );
+  });
 });

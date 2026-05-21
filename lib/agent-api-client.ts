@@ -10,6 +10,10 @@ type SearchLostItemsInput = {
   image?: File | null;
 };
 
+type StreamSearchLostItemsOptions = {
+  signal?: AbortSignal;
+};
+
 type PoliceGuideRequest = {
   atcId?: string;
   item?: SearchResult;
@@ -73,7 +77,20 @@ export function searchLostItemsWithAgent(input: SearchLostItemsInput) {
   });
 }
 
-export async function streamSearchLostItemsWithAgent(input: SearchLostItemsInput) {
+function createTimeoutSignal(timeoutMs: number, upstreamSignal?: AbortSignal) {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+
+  if (!upstreamSignal) {
+    return timeoutSignal;
+  }
+
+  return AbortSignal.any([timeoutSignal, upstreamSignal]);
+}
+
+export async function streamSearchLostItemsWithAgent(
+  input: SearchLostItemsInput,
+  options: StreamSearchLostItemsOptions = {},
+) {
   const formData = new FormData();
 
   if (input.query) {
@@ -91,7 +108,7 @@ export async function streamSearchLostItemsWithAgent(input: SearchLostItemsInput
   const response = await fetch(`${getAgentBaseUrl()}/search/stream`, {
     method: "POST",
     body: formData,
-    signal: AbortSignal.timeout(60_000),
+    signal: createTimeoutSignal(60_000, options.signal),
   });
 
   if (!response.ok) {

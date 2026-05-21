@@ -13,6 +13,7 @@ export type BrowserSearchProgress = {
 
 type BrowserSearchOptions = {
   onProgress?: (progress: BrowserSearchProgress) => void;
+  signal?: AbortSignal;
 };
 
 export type BrowserSearchResponse = LostItemsSearchResult & {
@@ -166,6 +167,7 @@ export async function searchLostItemsDirect(
   const response = await fetch("/api/search/stream", {
     method: "POST",
     body: formData,
+    signal: options.signal,
   });
 
   if (
