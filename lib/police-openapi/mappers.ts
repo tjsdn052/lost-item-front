@@ -24,6 +24,12 @@ function normalizeDate(date?: string) {
   return value;
 }
 
+function getSortableDate(date?: string) {
+  const compact = date?.replace(/\D/g, "") ?? "";
+
+  return /^\d{8}$/.test(compact) ? Number(compact) : 0;
+}
+
 function isNoImagePlaceholder(imageUrl?: string) {
   return !imageUrl || /no_img\.gif$/i.test(imageUrl);
 }
@@ -80,22 +86,28 @@ export function mapFoundItemToSearchResult(
 }
 
 export function mapFoundItemsToRecentItems(items: PoliceXmlItem[]): RecentItem[] {
-  return items.map((item) => {
-    const imageUrl = isNoImagePlaceholder(item.fdFilePathImg)
-      ? undefined
-      : item.fdFilePathImg;
-    const discoveredAt = normalizeDate(item.fdYmd);
+  return [...items]
+    .sort((a, b) => getSortableDate(b.fdYmd) - getSortableDate(a.fdYmd))
+    .map((item) => {
+      const imageUrl = isNoImagePlaceholder(item.fdFilePathImg)
+        ? undefined
+        : item.fdFilePathImg;
+      const discoveredAt = normalizeDate(item.fdYmd);
 
-    return {
-      id: item.atcId,
-      source: item.sourceService === "portal" ? "portal" : "police",
-      sequence: item.fdSn,
-      name: firstNonEmpty(item.fdPrdtNm, item.fdSbjt, item.prdtClNm) ?? "이름 없는 습득물",
-      location: firstNonEmpty(item.depPlace, item.orgNm, item.prdtClNm) ?? "보관 장소 확인 필요",
-      imageUrl,
-      badgeLabel: discoveredAt,
-      discoveredAt,
-      pickupPlace: firstNonEmpty(item.fdPlace, item.addr),
-    };
-  });
+      return {
+        id: item.atcId,
+        source: item.sourceService === "portal" ? "portal" : "police",
+        sequence: item.fdSn,
+        name:
+          firstNonEmpty(item.fdPrdtNm, item.fdSbjt, item.prdtClNm) ??
+          "이름 없는 습득물",
+        location:
+          firstNonEmpty(item.depPlace, item.orgNm, item.prdtClNm) ??
+          "보관 장소 확인 필요",
+        imageUrl,
+        badgeLabel: discoveredAt,
+        discoveredAt,
+        pickupPlace: firstNonEmpty(item.fdPlace, item.addr),
+      };
+    });
 }

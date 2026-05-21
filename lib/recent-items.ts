@@ -71,7 +71,7 @@ export async function getRecentItems(
         .filter((result) => result.status === "fulfilled")
         .map((result) => result.value),
     );
-    return mapFoundItemsToRecentItems(filterOpenFoundItems(response.items));
+    return mapFoundItemsToRecentItems(filterOpenFoundItems(response.items)).slice(0, limit);
   } catch {
     return [];
   }

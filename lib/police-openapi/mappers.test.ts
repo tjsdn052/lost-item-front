@@ -82,4 +82,36 @@ describe("police OpenAPI mappers", () => {
       },
     ]);
   });
+
+  it("sorts recent carousel items by discovered date descending", () => {
+    expect(
+      mapFoundItemsToRecentItems([
+        {
+          atcId: "F2026052000000001",
+          fdSn: "1",
+          fdPrdtNm: "경찰청 지갑",
+          fdYmd: "2026-05-20",
+          depPlace: "경찰청",
+          sourceService: "police",
+        },
+        {
+          atcId: "V2026052200000001",
+          fdSn: "1",
+          fdPrdtNm: "포털기관 카드",
+          fdYmd: "2026-05-22",
+          depPlace: "포털기관",
+          sourceService: "portal",
+        },
+      ]),
+    ).toMatchObject([
+      {
+        id: "V2026052200000001",
+        discoveredAt: "2026.05.22",
+      },
+      {
+        id: "F2026052000000001",
+        discoveredAt: "2026.05.20",
+      },
+    ]);
+  });
 });
