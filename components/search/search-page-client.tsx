@@ -31,6 +31,7 @@ export function SearchPageClient({
 
   useEffect(() => {
     let isCancelled = false;
+    const controller = new AbortController();
 
     async function hydrateResults() {
       if (!cacheKey) {
@@ -63,6 +64,8 @@ export function SearchPageClient({
         const nextResults = await searchLostItemsDirect({
           query,
           sessionId,
+        }, {
+          signal: controller.signal,
         });
 
         if (!isCancelled) {
@@ -85,6 +88,7 @@ export function SearchPageClient({
 
     return () => {
       isCancelled = true;
+      controller.abort();
     };
   }, [cacheKey, initialResults, query, sessionId]);
 

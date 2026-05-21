@@ -146,6 +146,7 @@ export function SearchBox({
   const attachedImagesRef = useRef<AttachedImage[]>([]);
   const morphTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const morphStartRectRef = useRef<DOMRect | null>(null);
+  const activeSearchControllerRef = useRef<AbortController | null>(null);
   const [query, setQuery] = useState(defaultQuery);
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const [draftAnswer, setDraftAnswer] = useState("");
@@ -225,6 +226,7 @@ export function SearchBox({
 
   useEffect(() => {
     return () => {
+      activeSearchControllerRef.current?.abort();
       attachedImagesRef.current.forEach((image) => {
         URL.revokeObjectURL(image.previewUrl);
       });
@@ -267,6 +269,8 @@ export function SearchBox({
 
   function resetChat() {
     searchRunIdRef.current += 1;
+    activeSearchControllerRef.current?.abort();
+    activeSearchControllerRef.current = null;
     if (morphTimeoutRef.current) {
       clearTimeout(morphTimeoutRef.current);
       morphTimeoutRef.current = null;
@@ -285,6 +289,10 @@ export function SearchBox({
     nextQuery: string,
     sessionId?: string | null,
   ): Promise<SearchAgentResponse | null> {
+    activeSearchControllerRef.current?.abort();
+    const controller = new AbortController();
+    activeSearchControllerRef.current = controller;
+
     try {
       const normalizedQuery = nextQuery.trim();
       const latestImage = attachedImages[attachedImages.length - 1]?.file ?? null;
@@ -293,6 +301,7 @@ export function SearchBox({
         sessionId: sessionId ?? undefined,
         image: latestImage,
       }, {
+        signal: controller.signal,
         onProgress: (progress) => {
           setActiveProgressIndex(0);
           setAgentProgressSteps([
@@ -304,6 +313,10 @@ export function SearchBox({
         },
       });
 
+      if (activeSearchControllerRef.current === controller) {
+        activeSearchControllerRef.current = null;
+      }
+
       const cacheKey = createSearchResultCacheKey();
       saveSearchResultToSession(cacheKey, result);
 
@@ -314,7 +327,13 @@ export function SearchBox({
         assistantMessage: result.assistantMessage,
         itemCount: result.items.length,
       };
-    } catch {
+    } catch (error) {
+      if (activeSearchControllerRef.current === controller) {
+        activeSearchControllerRef.current = null;
+      }
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return null;
+      }
       return null;
     }
   }
