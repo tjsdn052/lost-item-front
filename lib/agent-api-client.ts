@@ -73,6 +73,34 @@ export function searchLostItemsWithAgent(input: SearchLostItemsInput) {
   });
 }
 
+export async function streamSearchLostItemsWithAgent(input: SearchLostItemsInput) {
+  const formData = new FormData();
+
+  if (input.query) {
+    formData.set("query", input.query);
+  }
+
+  if (input.sessionId) {
+    formData.set("sessionId", input.sessionId);
+  }
+
+  if (input.image) {
+    formData.set("file", input.image);
+  }
+
+  const response = await fetch(`${getAgentBaseUrl()}/search/stream`, {
+    method: "POST",
+    body: formData,
+    signal: AbortSignal.timeout(60_000),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Agent API stream request failed: ${response.status}`);
+  }
+
+  return response;
+}
+
 export function fetchPoliceGuideFromAgent(input: PoliceGuideRequest) {
   return requestJson<PoliceGuideResponse>("/police-guide", {
     method: "POST",

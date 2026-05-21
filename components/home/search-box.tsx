@@ -158,6 +158,7 @@ export function SearchBox({
   const [searchStage, setSearchStage] = useState<SearchStage>("idle");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [activeProgressIndex, setActiveProgressIndex] = useState(0);
+  const [agentProgressSteps, setAgentProgressSteps] = useState<ProgressStep[]>([]);
   const searchRunIdRef = useRef(0);
   const [isMorphingFirstBubble, setIsMorphingFirstBubble] = useState(false);
   const [morphBubble, setMorphBubble] = useState<{
@@ -169,7 +170,8 @@ export function SearchBox({
     () => getProgressTimeline(searchStage),
     [searchStage],
   );
-  const progressSteps = progressTimeline.steps;
+  const progressSteps =
+    agentProgressSteps.length > 0 ? agentProgressSteps : progressTimeline.steps;
   const isSearchSubmitting =
     searchStage === "analyzing" ||
     searchStage === "matching" ||
@@ -182,6 +184,7 @@ export function SearchBox({
   function updateSearchStage(nextStage: SearchStage) {
     setSearchStage(nextStage);
     setActiveProgressIndex(0);
+    setAgentProgressSteps([]);
   }
 
   useEffect(() => {
@@ -289,6 +292,16 @@ export function SearchBox({
         query: normalizedQuery,
         sessionId: sessionId ?? undefined,
         image: latestImage,
+      }, {
+        onProgress: (progress) => {
+          setActiveProgressIndex(0);
+          setAgentProgressSteps([
+            {
+              id: progress.node,
+              label: progress.label,
+            },
+          ]);
+        },
       });
 
       const cacheKey = createSearchResultCacheKey();
