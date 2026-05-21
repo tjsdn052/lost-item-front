@@ -1,10 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  getFoundItemDetailUrl,
   mapFoundItemToSearchResult,
   mapFoundItemsToRecentItems,
 } from "@/lib/police-openapi/mappers";
 
 describe("police OpenAPI mappers", () => {
+  it("builds police 민원24 found item detail URLs", () => {
+    expect(getFoundItemDetailUrl("V0002164L05220004", "1")).toBe(
+      "https://minwon24.police.go.kr/cvlcpt/selectFindListDetail.do?cvlcptId=MW-201&pkupCmdtyMngId=V0002164L05220004&sortSn=1",
+    );
+  });
+
   it("maps a found item list record to a search result card", () => {
     expect(
       mapFoundItemToSearchResult(

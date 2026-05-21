@@ -2,7 +2,9 @@ import type { SearchResult } from "@/data/search-results";
 import type { RecentItem } from "@/lib/recent-items";
 import type { PoliceXmlItem } from "@/lib/police-openapi/types";
 
-const LOST112_DETAIL_URL = "https://www.lost112.go.kr/find/findDetail.do";
+const LOST112_DETAIL_URL =
+  "https://minwon24.police.go.kr/cvlcpt/selectFindListDetail.do";
+const LOST112_LOST_AND_FOUND_SERVICE_ID = "MW-201";
 
 function firstNonEmpty(...values: Array<string | undefined>) {
   return values.map((value) => value?.trim()).find(Boolean);
@@ -49,11 +51,12 @@ function formatMatchLabel(score: number) {
 
 export function getFoundItemDetailUrl(atcId: string, sequence?: string) {
   const params = new URLSearchParams({
-    ATC_ID: atcId,
+    cvlcptId: LOST112_LOST_AND_FOUND_SERVICE_ID,
+    pkupCmdtyMngId: atcId,
   });
 
   if (sequence) {
-    params.set("FD_SN", sequence);
+    params.set("sortSn", sequence);
   }
 
   return `${LOST112_DETAIL_URL}?${params.toString()}`;
