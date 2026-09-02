@@ -4,6 +4,10 @@ const nextConfig: NextConfig = {
   basePath: "/map",
 
   images: {
+    // The deployment does not serve Next's /_next/image optimizer endpoint.
+    // Load configured remote images directly instead of generating broken
+    // /map/_next/image URLs.
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",
