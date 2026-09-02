@@ -10,7 +10,7 @@ export function SiteHeader() {
           className="flex items-center gap-3 transition-opacity hover:opacity-80"
         >
           <Image
-            src="/logo.svg"
+            src="/map/logo.svg"
             alt="FoundIt"
             width={140}
             height={38}

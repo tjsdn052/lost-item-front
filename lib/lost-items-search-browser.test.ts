@@ -41,7 +41,7 @@ describe("lost-items-search-browser", () => {
     );
 
     expect(fetch).toHaveBeenCalledWith(
-      "/api/search/stream",
+      "/map/api/search/stream",
       expect.objectContaining({
         method: "POST",
         body: expect.any(FormData),
@@ -74,7 +74,7 @@ describe("lost-items-search-browser", () => {
     );
 
     expect(fetch).toHaveBeenCalledWith(
-      "/api/search/stream",
+      "/map/api/search/stream",
       expect.objectContaining({
         signal: controller.signal,
       }),

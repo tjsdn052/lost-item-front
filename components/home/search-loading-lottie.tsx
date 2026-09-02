@@ -26,7 +26,7 @@ export function SearchLoadingLottie({ visible }: SearchLoadingLottieProps) {
           }`}
         >
           <lottie-player
-            src="/loading.json"
+            src="/map/loading.json"
             autoplay
             loop
             background="transparent"

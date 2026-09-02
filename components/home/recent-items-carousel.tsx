@@ -181,7 +181,7 @@ export function RecentItemsCarousel({ items }: RecentItemsCarouselProps) {
     setIsLoadingGuide(true);
 
     try {
-      const response = await fetch("/api/police-guide", {
+      const response = await fetch("/map/api/police-guide", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -8,9 +8,9 @@ export const metadata: Metadata = {
   description:
     "설명만 하면 분실물을 계속 추적하고 알려주는 찾았독 랜딩 페이지입니다.",
   icons: {
-    icon: "/logo.svg",
-    shortcut: "/logo.svg",
-    apple: "/logo.svg",
+    icon: "/map/logo.svg",
+    shortcut: "/map/logo.svg",
+    apple: "/map/logo.svg",
   },
 };
 

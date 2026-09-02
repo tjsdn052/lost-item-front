@@ -20,7 +20,7 @@ export function SearchToolbar({ query, sessionId }: SearchToolbarProps) {
   return (
     <section className="mx-auto mb-12 max-w-7xl px-8">
       <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
-        <form action="/search" className="w-full md:max-w-xl">
+        <form action="/map/search" className="w-full md:max-w-xl">
           {sessionId ? <input type="hidden" name="sid" value={sessionId} /> : null}
           <label
             htmlFor="search-query"

@@ -14,7 +14,7 @@ export function SearchStatusBanner({ assistantMessage }: SearchStatusBannerProps
       <div className="rounded-[1.25rem] border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-[0_18px_42px_rgba(25,28,30,0.06)]">
         <div className="flex items-center">
           <Image
-            src="/back.svg"
+            src="/map/back.svg"
             alt="찾았독"
             width={72}
             height={72}

@@ -62,7 +62,7 @@ function processSseChunk(
 }
 
 async function requestSearchJson(formData: FormData) {
-  const response = await fetch("/api/search/submit", {
+  const response = await fetch("/map/api/search/submit", {
     method: "POST",
     body: formData,
   });
@@ -164,7 +164,7 @@ export async function searchLostItemsDirect(
     formData.set("file", image);
   }
 
-  const response = await fetch("/api/search/stream", {
+  const response = await fetch("/map/api/search/stream", {
     method: "POST",
     body: formData,
     signal: options.signal,
